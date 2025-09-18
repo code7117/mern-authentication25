@@ -1,7 +1,11 @@
 import React, { createContext, useEffect, useState } from "react";
+import axios from "axios";
 import { toast } from "react-toastify";
 
 export const AppContext = createContext();
+
+// ✅ Axios default configuration
+axios.defaults.withCredentials = true;
 
 export const AppContextProvider = ({ children }) => {
   const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:4000";
@@ -13,24 +17,16 @@ export const AppContextProvider = ({ children }) => {
   // ---------------- FETCH USER DATA ----------------
   const getUserData = async () => {
     try {
-      const res = await fetch(`${backendUrl}/api/user/data`, {
-        method: "GET",
-        credentials: "include", // ✅ send cookies
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await axios.get(`${backendUrl}/api/user/data`);
+      console.log("User data response:", response.data);
 
-      const data = await res.json();
-      console.log("User data response:", data);
-
-      if (data.status && data.data) {
-        setUserData(data.data);
+      if (response.data.status && response.data.data) {
+        setUserData(response.data.data);
         setIsLoggedin(true);
       } else {
         setUserData(null);
         setIsLoggedin(false);
-        toast.error(data.message || "Failed to fetch user data.");
+        toast.error(response.data.message || "Failed to fetch user data.");
       }
     } catch (err) {
       console.error("Error fetching user data:", err);
@@ -43,18 +39,10 @@ export const AppContextProvider = ({ children }) => {
   // ---------------- CHECK AUTH STATE ----------------
   const getAuthState = async () => {
     try {
-      const res = await fetch(`${backendUrl}/api/auth/is-auth`, {
-        method: "GET",
-        credentials: "include", // ✅ send cookies
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await axios.get(`${backendUrl}/api/auth/is-auth`);
+      console.log("Auth state response:", response.data);
 
-      const data = await res.json();
-      console.log("Auth state response:", data);
-
-      if (data.status) {
+      if (response.data.status) {
         await getUserData();
       } else {
         setUserData(null);
