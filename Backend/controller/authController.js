@@ -93,22 +93,17 @@ authController.Logout = async (req, res) => {
 
 // ---------------- IS AUTHENTICATED ----------------
 authController.isAuthenticated = async (req, res) => {
-    try {
-        const token = req.cookies.token;
-        if (!token)
-            return { status: false, message: "Unauthorized" };
+  try {
+    const token = req.cookies.token;
+    if (!token) return res.json({ status: false, message: "Not logged in" });
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await userModel.findById(decoded.id).select("-password");
-        if (!user)
-            return { status: false, message: "User not found" };
-
-        return { status: true, data: user };
-    } catch (err) {
-        console.error("isAuthenticated Error:", err);
-        return { status: false, message: "Unauthorized" };
-    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return res.json({ status: true, userId: decoded.id });
+  } catch (err) {
+    return res.json({ status: false, message: "Auth Error" });
+  }
 };
+
 
 // ---------------- SEND VERIFY OTP ----------------
 authController.sendVerifyOtp = async (req, res) => {
