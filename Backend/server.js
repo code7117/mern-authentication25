@@ -18,6 +18,7 @@ const allowedOrigins =['http://localhost:3000','https://mern-authentication25.ve
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({origin:allowedOrigins , credentials: true }));
+app.use(express.static("public"));
 
 // API Endpoints
 app.get('/', (req, res) => res.send("API Working"));
