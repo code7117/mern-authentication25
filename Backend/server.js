@@ -11,7 +11,11 @@ const port = process.env.PORT || 4000;
 
 // Connect to MongoDB
 connectDB();
-const allowedOrigins =['http://localhost:3000','https://mern-authentication25.vercel.app'
+const allowedOrigins =['http://localhost:3000','https://mern-authentication25.vercel.app',
+  
+  "https://mern-authentication25-kmyen6u7c-adharshs-projects-036f6432.vercel.app" // ✅ your actual frontend
+];
+
   
 ]
 // Middleware
