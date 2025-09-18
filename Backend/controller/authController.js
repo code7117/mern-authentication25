@@ -100,6 +100,7 @@ authController.isAuthenticated = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     return res.json({ status: true, userId: decoded.id });
   } catch (err) {
+      console.log(err);
     return res.json({ status: false, message: "Auth Error" });
   }
 };
