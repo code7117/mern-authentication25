@@ -10,51 +10,48 @@ const Login = () => {
   const navigate = useNavigate();
   const { backendUrl, setIsLoggedin, getUserData } = useContext(AppContext);
 
-  const [state, setState] = useState("Sign Up");
+  const [state, setState] = useState("Sign Up"); // "Sign Up" or "Login"
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const onSubmitHandler = async (e) => {
     e.preventDefault();
-    axios.defaults.withCredentials = true;
+    setLoading(true);
 
     try {
-      if (state === "Sign Up") {
-        const { data } = await axios.post(`${backendUrl}/api/auth/register`, {
-          name,
-          email,
-          password,
-        });
-        console.log("Register Response:", data);
+      const endpoint = state === "Sign Up" ? "register" : "login";
+      const payload =
+        state === "Sign Up"
+          ? { name, email, password }
+          : { email, password };
 
-        if (data.status) {
-          setIsLoggedin(true);
-          await getUserData();
-          toast.success("Account created successfully!");
-          navigate("/"); // instant navigation
-        } else {
-          toast.error(data.message);
-        }
+      const { data } = await axios.post(
+        `${backendUrl}/api/auth/${endpoint}`,
+        payload,
+        { withCredentials: true } // important to send cookies
+      );
+
+      console.log(`${endpoint} Response:`, data);
+
+      if (data.status) {
+        await getUserData(); // fetch user data after login/register
+        setIsLoggedin(true);
+        toast.success(
+          state === "Sign Up"
+            ? "Account created successfully!"
+            : "Login successful!"
+        );
+        navigate("/"); // redirect after success
       } else {
-        const { data } = await axios.post(`${backendUrl}/api/auth/login`, {
-          email,
-          password,
-        });
-        console.log("Login Response:", data);
-
-        if (data.status) {
-          setIsLoggedin(true);
-          await getUserData();
-          toast.success("Login successful!");
-          navigate("/"); // instant navigation
-        } else {
-          toast.error(data.message);
-        }
+        toast.error(data.message || "Something went wrong!");
       }
     } catch (err) {
-      console.log("Error:", err);
+      console.error("Auth Error:", err.response?.data || err.message);
       toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -121,7 +118,10 @@ const Login = () => {
           >
             Forgot password?
           </p>
-          <button className={Styles.btn}>{state}</button>
+
+          <button className={Styles.btn} disabled={loading}>
+            {loading ? "Please wait..." : state}
+          </button>
         </form>
 
         {state === "Sign Up" ? (
