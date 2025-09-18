@@ -11,26 +11,28 @@ const port = process.env.PORT || 4000;
 
 // Connect to MongoDB
 connectDB();
-const allowedOrigins =['http://localhost:3000','https://mern-authentication25.vercel.app',
-  
-  "https://mern-authentication25-kmyen6u7c-adharshs-projects-036f6432.vercel.app" // ✅ your actual frontend
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://mern-authentication25.vercel.app", // main production domain
+  /\.vercel\.app$/ // allow any Vercel preview deployment
 ];
 
-  
-]
-// Middleware
-app.use(express.json());
-app.use(cookieParser());
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
+    if (!origin) return callback(null, true); // allow server-to-server requests
+    const isAllowed = allowedOrigins.some(o => 
+      o instanceof RegExp ? o.test(origin) : o === origin
+    );
+    if (isAllowed) return callback(null, true);
+    callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
 }));
+
+// Middleware
+app.use(express.json());
+app.use(cookieParser());
+
 app.use(express.static("public"));
 
 // API Endpoints
