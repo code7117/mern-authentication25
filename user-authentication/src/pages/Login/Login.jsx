@@ -9,6 +9,7 @@ import { toast } from "react-toastify";
 const Login = () => {
   const navigate = useNavigate();
   const { backendUrl, setIsLoggedin, getUserData } = useContext(AppContext);
+  axios.defaults.withCredentials = true;
 
   const [state, setState] = useState("Sign Up"); // "Sign Up" or "Login"
   const [name, setName] = useState("");
