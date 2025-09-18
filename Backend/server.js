@@ -1,6 +1,7 @@
 require('dotenv').config(); // ✅ Load environment variables first
-const express = require('express');
 const cors = require('cors');
+const express = require('express');
+
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/mongodb');
 const authRouter = require('./routes/authRoutes');
@@ -30,8 +31,9 @@ app.use(cors({
 }));
 
 // Middleware
-app.use(express.json());
+
 app.use(cookieParser());
+app.use(express.json());
 
 app.use(express.static("public"));
 
