@@ -4,165 +4,128 @@ const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const mailhelper = require('../helper/mailhelper');
 
-const authController = new Object();
+const authController = {};
 
-// Register Controller
+// Helper: create JWT token
+const createToken = (id) => {
+    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
+
+// ---------------- REGISTER ----------------
 authController.Register = async (req, res) => {
     const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
+    if (!name || !email || !password)
         return { status: false, message: 'Missing Details' };
-    }
 
-    // Validate email format
-    if (!validator.isEmail(email)) {
+    if (!validator.isEmail(email))
         return { status: false, message: 'Invalid Email Format' };
-    }
 
     try {
-        // Check if user already exists
         const existingUser = await userModel.findOne({ email });
-        if (existingUser) {
+        if (existingUser)
             return { status: false, message: "User already exists" };
-        }
 
-        // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await userModel.create({ name, email, password: hashedPassword });
 
-        // Create user
-        const user = new userModel({
-            name: name,
-            email: email,
-            password: hashedPassword
-        });
-        await user.save();
-
-        // Generate JWT token
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
-        // Set cookie
+        const token = createToken(user._id);
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict',
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
-        if (user) {
-            // const subject = "welcome to king "
-            console.log(user.email, user.name)
-            await mailhelper.sendMail(user.email, user.name,)
-        }
+        // Send welcome email
+        await mailhelper.sendMail(user.email, user.name);
 
-
-        return { status: true, data: user };
+        return { status: true, message: 'Registration successful', data: user };
     } catch (err) {
-        console.log(err);
+        console.error(err);
         return { status: false, message: 'Server Error' };
     }
 };
 
-// Login Controller
+// ---------------- LOGIN ----------------
 authController.Login = async (req, res) => {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (!email || !password)
         return { status: false, message: "Email and Password are required" };
-    }
 
     try {
         const user = await userModel.findOne({ email });
-        if (!user) {
+        if (!user)
             return { status: false, message: "Invalid Email" };
-        }
 
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
+        if (!isMatch)
             return { status: false, message: "Invalid Password" };
-        }
 
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const token = createToken(user._id);
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict',
             maxAge: 7 * 24 * 60 * 60 * 1000
         });
 
         return { status: true, message: "Login successful", data: user };
     } catch (err) {
-        console.log(err);
+        console.error(err);
         return { status: false, message: 'Server Error' };
     }
 };
 
-// Logout Controller
+// ---------------- LOGOUT ----------------
 authController.Logout = async (req, res) => {
     try {
         res.clearCookie('token', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict'
         });
         return { status: true, message: "Logged Out" };
     } catch (err) {
-        console.log(err);
+        console.error(err);
         return { status: false, message: 'Server Error' };
     }
 };
 
+// ---------------- IS AUTHENTICATED ----------------
+authController.isAuthenticated = async (req, res) => {
+    try {
+        const token = req.cookies.token;
+        if (!token)
+            return { status: false, message: "Unauthorized" };
 
-// authController.sendVerifyOtp = async(req,res)=>{
-//     try{
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await userModel.findById(decoded.id).select("-password");
+        if (!user)
+            return { status: false, message: "User not found" };
 
-//         const userId = req.body;
-//         const user = await userModel.findById(userId)
+        return { status: true, data: user };
+    } catch (err) {
+        console.error("isAuthenticated Error:", err);
+        return { status: false, message: "Unauthorized" };
+    }
+};
 
-// if(user.isAccountVerified){
-//     return{status:false,message:"Account already verified"}
-// }
-// const otp = String(Math.floor(100000 + Math.random()*900000));
-
-// user.verifyOtp = otp;
-// user.verifyOtpExpireAt = Date.now() + 24 * 60 * 60 * 1000
-// await user.save();
-
-//     if(user){
-
-//             console.log(user.email,user.name,otp)
-//             await mailhelper.sendMail(user.email,user.name, otp)
-//         }
-//         return{status:true,message:"verification OTP sent on Email"}
-
-//     }catch(err){
-//         console.log(err)
-
-//     }
-// }
+// ---------------- SEND VERIFY OTP ----------------
 authController.sendVerifyOtp = async (req, res) => {
     try {
-        const userId = req.userId; // ✅ Use the ID set by userAuth middleware
+        const userId = req.userId;
         const user = await userModel.findById(userId);
-
-        if (!user) {
+        if (!user)
             return { status: false, message: "User not found" };
-        }
-
-        if (user.isAccountVerified) {
+        if (user.isAccountVerified)
             return { status: false, message: "Account already verified" };
-        }
 
-        // Generate OTP
         const otp = String(Math.floor(100000 + Math.random() * 900000));
-
-        // Save OTP and expiry
         user.verifyOtp = otp;
         user.verifyOtpExpireAt = Date.now() + 24 * 60 * 60 * 1000;
         await user.save();
 
-        // Send OTP
-        console.log(user.email, user.name, otp);
         await mailhelper.sendOtpMail(user.email, user.name, otp);
-
         return { status: true, message: "Verification OTP sent to email" };
     } catch (err) {
         console.error(err);
@@ -170,108 +133,84 @@ authController.sendVerifyOtp = async (req, res) => {
     }
 };
 
-
+// ---------------- VERIFY EMAIL ----------------
 authController.verifyEmail = async (req, res) => {
     const { otp } = req.body;
     const userId = req.userId;
 
+    if (!userId || !otp)
+        return { status: false, message: "Missing Details" };
 
-
-    if (!userId || !otp) {
-        return { status: false, message: "missing Details" }
-    }
     try {
         const user = await userModel.findById(userId);
-        if (!user) {
-            return { status: false, message: "User not found" }
-        }
-        console.log("OTP from DB:", user.verifyOtp);
-        console.log("OTP from User:", otp);
-        if (user.verifyOtp === '' || user.verifyOtp !== otp) {
-            return { status: false, message: 'Invalid OTP' };
+        if (!user)
+            return { status: false, message: "User not found" };
 
-        }
-        if (user.verifyOtpExpireAt < Date.now()) {
-            return { status: false, message: 'OTP Expired' }
-        }
+        if (!user.verifyOtp || user.verifyOtp !== otp)
+            return { status: false, message: "Invalid OTP" };
+
+        if (user.verifyOtpExpireAt < Date.now())
+            return { status: false, message: "OTP Expired" };
+
         user.isAccountVerified = true;
         user.verifyOtp = '';
         user.verifyOtpExpireAt = 0;
-
         await user.save();
-        return { status: true, message: 'Email verified succesfully' }
+
+        return { status: true, message: "Email verified successfully" };
     } catch (err) {
-        console.log(err)
-
+        console.error(err);
+        return { status: false, message: "Server error" };
     }
-}
+};
 
-//check if user Authenticated
-authController.isAuthenticated = async (req, res) => {
-    try {
-        return { status: true }
-    } catch (err) {
-        console.log(err)
-    }
-}
-
-//send password reset otp
+// ---------------- RESET OTP ----------------
 authController.sendResetOtp = async (req, res) => {
     const { email } = req.body;
-    if (!email) {
-        return { status: false, message: 'Email is Required' }
-    }
-    try {
-        const user = await userModel.findOne({ email })
-        if (!user) {
-            return { status: false, message: 'user not found' }
-        }
-        // Generate OTP
-        const otp = String(Math.floor(100000 + Math.random() * 900000));
+    if (!email) return { status: false, message: 'Email is Required' };
 
-        // Save OTP and expiry
+    try {
+        const user = await userModel.findOne({ email });
+        if (!user) return { status: false, message: 'User not found' };
+
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
         user.resetOtp = otp;
         user.resetOtpExpireAt = Date.now() + 15 * 60 * 1000;
         await user.save();
 
-        // Send OTP
-        console.log(user.email, user.name, otp);
         await mailhelper.sendresetOtpMail(user.email, user.name, otp);
-        return { status: true, message: "OTP sent to your email" }
+        return { status: true, message: "OTP sent to your email" };
     } catch (err) {
-        console.log(err)
+        console.error(err);
+        return { status: false, message: "Server error" };
     }
-}
+};
 
+// ---------------- RESET PASSWORD ----------------
 authController.resetPassword = async (req, res) => {
     const { email, otp, newPassword } = req.body;
-    if (!email || !otp || !newPassword) {
-        return { status: false, message: 'Email, OTP, and    new password are required' }
+    if (!email || !otp || !newPassword)
+        return { status: false, message: 'Email, OTP, and new password are required' };
 
-    }
     try {
-        const user = await userModel.findOne({email})
-        if(!user){
-            return{status:false,message:"user not found"};
-        }
-        if(user.resetOtp === "" || user.resetOtp !== otp){
-            return{status:false,message:'Invalid OTP'}
-        }
-        if(user.resetOtpExpireAt < Date.now()){
-            return{status:false,message:"Otp Expired"}
-        }
-        const hashedPassword = await bcrypt.hash(newPassword,10);
-        user.password = hashedPassword;
-        user.resetOtp;
+        const user = await userModel.findOne({ email });
+        if (!user) return { status: false, message: "User not found" };
+
+        if (!user.resetOtp || user.resetOtp !== otp)
+            return { status: false, message: 'Invalid OTP' };
+        if (user.resetOtpExpireAt < Date.now())
+            return { status: false, message: "OTP Expired" };
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        user.resetOtp = '';
         user.resetOtpExpireAt = 0;
+        await user.save();
 
-
-        await user.save()
-        return{status:true,message:"Password has been reset successfully"}
-        
+        return { status: true, message: "Password has been reset successfully" };
     } catch (err) {
-        console.log(err)
+        console.error(err);
+        return { status: false, message: "Server error" };
     }
-}
+};
 
 module.exports = authController;
