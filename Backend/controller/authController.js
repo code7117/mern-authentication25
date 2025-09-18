@@ -47,33 +47,33 @@ authController.Register = async (req, res) => {
 };
 
 // ---------------- LOGIN ----------------
+// authController.js
 authController.Login = async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password)
-        return { status: false, message: "Email and Password are required" };
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.json({ status: false, message: "Email and Password are required" });
+  }
 
-    try {
-        const user = await userModel.findOne({ email });
-        if (!user)
-            return { status: false, message: "Invalid Email" };
+  try {
+    const user = await userModel.findOne({ email });
+    if (!user) return res.json({ status: false, message: "Invalid Email" });
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch)
-            return { status: false, message: "Invalid Password" };
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.json({ status: false, message: "Invalid Password" });
 
-        const token = createToken(user._id);
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true,      // ✅ cross-site cookie
+      sameSite: 'None',  // ✅ cross-site
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
-        return { status: true, message: "Login successful", data: user };
-    } catch (err) {
-        console.error(err);
-        return { status: false, message: 'Server Error' };
-    }
+    return res.json({ status: true, message: "Login successful", data: user });
+  } catch (err) {
+    console.log(err);
+    return res.json({ status: false, message: "Server Error" });
+  }
 };
 
 // ---------------- LOGOUT ----------------
