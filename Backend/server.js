@@ -14,21 +14,21 @@ const port = process.env.PORT || 4000;
 connectDB();
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://mern-authentication25.vercel.app", // main production domain
-  /\.vercel\.app$/ // allow any Vercel preview deployment
+  "https://mern-authentication25.vercel.app",
+  "https://mern-authentication25-2te2ob80y-adharshs-projects-036f6432.vercel.app"
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow server-to-server requests
-    const isAllowed = allowedOrigins.some(o => 
-      o instanceof RegExp ? o.test(origin) : o === origin
-    );
-    if (isAllowed) return callback(null, true);
-    callback(new Error("Not allowed by CORS"));
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
   },
-  credentials: true,
+  credentials: true, // ✅ allow cookies
 }));
+
 
 // Middleware
 
