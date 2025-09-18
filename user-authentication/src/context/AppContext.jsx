@@ -3,30 +3,25 @@ import { createContext, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
 export const AppContext = createContext();
-axios.defaults.withCredentials =true;
 
 export const AppContextProvider = ({ children }) => {
   const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:4000";
-  console.log("Backend URL:", backendUrl);
 
   const [isLoggedin, setIsLoggedin] = useState(false);
   const [userData, setUserData] = useState(null);
 
-  // Fetch logged-in user data
+  // Fetch user data
   const getUserData = async () => {
     try {
       const response = await axios.get(`${backendUrl}/api/user/data`, {
-        withCredentials: true,
-   
+        withCredentials: true, // 🔑 send cookies
       });
 
-      console.log("Raw user data response:", response);
-
       const user = response.data?.data;
+
       if (response.data?.status && user) {
-        setUserData(user);  // set only user object
+        setUserData(user);
         setIsLoggedin(true);
-        console.log("User data fetched:", user);
       } else {
         setUserData(null);
         setIsLoggedin(false);
@@ -40,14 +35,12 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Check authentication state on app load
+  // Check authentication
   const getAuthState = async () => {
     try {
       const response = await axios.get(`${backendUrl}/api/auth/is-auth`, {
-        withCredentials: true,
-   
+        withCredentials: true, // 🔑 send cookies
       });
-
       if (response.data?.status) {
         await getUserData();
       }
@@ -66,7 +59,7 @@ export const AppContextProvider = ({ children }) => {
     setIsLoggedin,
     userData,
     setUserData,
-    getUserData
+    getUserData,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
