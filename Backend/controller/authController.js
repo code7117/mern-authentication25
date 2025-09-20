@@ -93,20 +93,27 @@ authController.sendResetOtp = async (req, res) => {
 };
 
 // ---------------- VERIFY RESET OTP ----------------
+// ---------------- VERIFY RESET OTP ----------------
 authController.verifyResetOtp = async (req, res) => {
   const { email, otp } = req.body;
-  if (!email || !otp) return res.json({ status: false, message: "Email and OTP are required" });
+
+  if (!email || !otp) {
+    return res.json({ status: false, message: "Email and OTP are required" });
+  }
 
   try {
     const user = await userModel.findOne({ email });
     if (!user) return res.json({ status: false, message: "User not found" });
 
-    // Ensure OTP is string comparison
-    if (!user.resetOtp || user.resetOtp !== String(otp))
-      return res.json({ status: false, message: 'Invalid OTP' });
+    // Check if OTP matches
+    if (!user.resetOtp || user.resetOtp !== otp) {
+      return res.json({ status: false, message: "Invalid OTP" });
+    }
 
-    if (user.resetOtpExpireAt < Date.now())
+    // Check if OTP expired
+    if (user.resetOtpExpireAt < Date.now()) {
       return res.json({ status: false, message: "OTP expired" });
+    }
 
     return res.json({ status: true, message: "OTP verified successfully" });
   } catch (err) {
@@ -114,6 +121,7 @@ authController.verifyResetOtp = async (req, res) => {
     return res.json({ status: false, message: "Server error" });
   }
 };
+
 
 // ---------------- RESET PASSWORD ----------------
 authController.resetPassword = async (req, res) => {
