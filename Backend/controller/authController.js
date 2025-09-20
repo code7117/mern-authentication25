@@ -7,200 +7,140 @@ const mailhelper = require('../helper/mailhelper');
 const authController = {};
 
 // Helper: create JWT token
-const createToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-};
+const createToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
 // ---------------- REGISTER ----------------
 authController.Register = async (req, res) => {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password)
-        return res.json({ status: false, message: 'Missing Details' });
+  const { name, email, password } = req.body;
+  if (!name || !email || !password)
+    return res.json({ status: false, message: 'Missing Details' });
 
-    if (!validator.isEmail(email))
-        return res.json({ status: false, message: 'Invalid Email Format' });
+  if (!validator.isEmail(email))
+    return res.json({ status: false, message: 'Invalid Email Format' });
 
-    try {
-        const existingUser = await userModel.findOne({ email });
-        if (existingUser)
-            return res.json({ status: false, message: "User already exists" });
+  try {
+    const existingUser = await userModel.findOne({ email });
+    if (existingUser)
+      return res.json({ status: false, message: "User already exists" });
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await userModel.create({ name, email, password: hashedPassword });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await userModel.create({ name, email, password: hashedPassword });
 
-        const token = createToken(user._id);
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+    const token = createToken(user._id);
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
-        // Send welcome email
-        await mailhelper.sendMail(user.email, user.name);
-
-        return res.json({ status: true, message: 'Registration successful', data: user });
-    } catch (err) {
-        console.error(err);
-        return res.json({ status: false, message: 'Server Error' });
-    }
+    await mailhelper.sendMail(user.email, user.name);
+    return res.json({ status: true, message: 'Registration successful', data: user });
+  } catch (err) {
+    console.error(err);
+    return res.json({ status: false, message: 'Server Error' });
+  }
 };
 
 // ---------------- LOGIN ----------------
 authController.Login = async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-        return res.json({ status: false, message: "Email and Password are required" });
-    }
+  const { email, password } = req.body;
+  if (!email || !password)
+    return res.json({ status: false, message: "Email and Password are required" });
 
-    try {
-        const user = await userModel.findOne({ email });
-        if (!user) return res.json({ status: false, message: "Invalid Email" });
+  try {
+    const user = await userModel.findOne({ email });
+    if (!user) return res.json({ status: false, message: "Invalid Email" });
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.json({ status: false, message: "Invalid Password" });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.json({ status: false, message: "Invalid Password" });
 
-        const token = createToken(user._id);
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+    const token = createToken(user._id);
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
-        return res.json({ status: true, message: "Login successful", data: user });
-    } catch (err) {
-        console.log(err);
-        return res.json({ status: false, message: "Server Error" });
-    }
-};
-
-// ---------------- LOGOUT ----------------
-authController.Logout = async (req, res) => {
-    try {
-        res.clearCookie('token', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Strict'
-        });
-        return res.json({ status: true, message: "Logged Out" });
-    } catch (err) {
-        console.error(err);
-        return res.json({ status: false, message: 'Server Error' });
-    }
-};
-
-// ---------------- IS AUTHENTICATED ----------------
-authController.isAuthenticated = async (req, res) => {
-    try {
-        const token = req.cookies.token;
-        if (!token) return res.json({ status: false, message: "Not logged in" });
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        return res.json({ status: true, userId: decoded.id });
-    } catch (err) {
-        console.log(err);
-        return res.json({ status: false, message: "Auth Error" });
-    }
-};
-
-// ---------------- SEND VERIFY OTP ----------------
-authController.sendVerifyOtp = async (req, res) => {
-    try {
-        const userId = req.userId;
-        const user = await userModel.findById(userId);
-        if (!user) return res.json({ status: false, message: "User not found" });
-        if (user.isAccountVerified) return res.json({ status: false, message: "Account already verified" });
-
-        const otp = String(Math.floor(100000 + Math.random() * 900000));
-        user.verifyOtp = otp;
-        user.verifyOtpExpireAt = Date.now() + 24 * 60 * 60 * 1000;
-        await user.save();
-
-        await mailhelper.sendOtpMail(user.email, user.name, otp);
-        return res.json({ status: true, message: "Verification OTP sent to email" });
-    } catch (err) {
-        console.error(err);
-        return res.json({ status: false, message: "Server error" });
-    }
-};
-
-// ---------------- VERIFY EMAIL ----------------
-authController.verifyEmail = async (req, res) => {
-    const { otp } = req.body;
-    const userId = req.userId;
-
-    if (!userId || !otp) return res.json({ status: false, message: "Missing Details" });
-
-    try {
-        const user = await userModel.findById(userId);
-        if (!user) return res.json({ status: false, message: "User not found" });
-
-        if (!user.verifyOtp || user.verifyOtp !== otp)
-            return res.json({ status: false, message: "Invalid OTP" });
-
-        if (user.verifyOtpExpireAt < Date.now())
-            return res.json({ status: false, message: "OTP Expired" });
-
-        user.isAccountVerified = true;
-        user.verifyOtp = '';
-        user.verifyOtpExpireAt = 0;
-        await user.save();
-
-        return res.json({ status: true, message: "Email verified successfully" });
-    } catch (err) {
-        console.error(err);
-        return res.json({ status: false, message: "Server error" });
-    }
+    return res.json({ status: true, message: "Login successful", data: user });
+  } catch (err) {
+    console.log(err);
+    return res.json({ status: false, message: "Server Error" });
+  }
 };
 
 // ---------------- SEND RESET OTP ----------------
 authController.sendResetOtp = async (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.json({ status: false, message: 'Email is Required' });
+  const { email } = req.body;
+  if (!email) return res.json({ status: false, message: 'Email is required' });
 
-    try {
-        const user = await userModel.findOne({ email });
-        if (!user) return res.json({ status: false, message: 'User not found' });
+  try {
+    const user = await userModel.findOne({ email });
+    if (!user) return res.json({ status: false, message: 'User not found' });
 
-        const otp = String(Math.floor(100000 + Math.random() * 900000));
-        user.resetOtp = otp;
-        user.resetOtpExpireAt = Date.now() + 15 * 60 * 1000;
-        await user.save();
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    user.resetOtp = otp;
+    user.resetOtpExpireAt = Date.now() + 5 * 60 * 1000; // OTP valid 5 mins
+    await user.save();
 
-        await mailhelper.sendresetOtpMail(user.email, user.name, otp);
-        return res.json({ status: true, message: "OTP sent to your email" });
-    } catch (err) {
-        console.error(err);
-        return res.json({ status: false, message: "Server error" });
-    }
+    await mailhelper.sendresetOtpMail(user.email, user.name, otp);
+    return res.json({ status: true, message: "OTP sent successfully" });
+  } catch (err) {
+    console.error(err);
+    return res.json({ status: false, message: "Server error" });
+  }
+};
+
+// ---------------- VERIFY RESET OTP ----------------
+authController.verifyResetOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.json({ status: false, message: "Email and OTP are required" });
+
+  try {
+    const user = await userModel.findOne({ email });
+    if (!user) return res.json({ status: false, message: "User not found" });
+
+    // Ensure OTP is string comparison
+    if (!user.resetOtp || user.resetOtp !== String(otp))
+      return res.json({ status: false, message: 'Invalid OTP' });
+
+    if (user.resetOtpExpireAt < Date.now())
+      return res.json({ status: false, message: "OTP expired" });
+
+    return res.json({ status: true, message: "OTP verified successfully" });
+  } catch (err) {
+    console.error(err);
+    return res.json({ status: false, message: "Server error" });
+  }
 };
 
 // ---------------- RESET PASSWORD ----------------
 authController.resetPassword = async (req, res) => {
-    const { email, otp, newPassword } = req.body;
-    if (!email || !otp || !newPassword)
-        return res.json({ status: false, message: 'Email, OTP, and new password are required' });
+  const { email, otp, newPassword } = req.body;
+  if (!email || !otp || !newPassword)
+    return res.json({ status: false, message: 'Email, OTP, and new password are required' });
 
-    try {
-        const user = await userModel.findOne({ email });
-        if (!user) return res.json({ status: false, message: "User not found" });
+  try {
+    const user = await userModel.findOne({ email });
+    if (!user) return res.json({ status: false, message: "User not found" });
 
-        if (!user.resetOtp || user.resetOtp !== otp)
-            return res.json({ status: false, message: 'Invalid OTP' });
-        if (user.resetOtpExpireAt < Date.now())
-            return res.json({ status: false, message: "OTP Expired" });
+    if (!user.resetOtp || user.resetOtp !== String(otp))
+      return res.json({ status: false, message: 'Invalid OTP' });
 
-        user.password = await bcrypt.hash(newPassword, 10);
-        user.resetOtp = '';
-        user.resetOtpExpireAt = 0;
-        await user.save();
+    if (user.resetOtpExpireAt < Date.now())
+      return res.json({ status: false, message: "OTP expired" });
 
-        return res.json({ status: true, message: "Password has been reset successfully" });
-    } catch (err) {
-        console.error(err);
-        return res.json({ status: false, message: "Server error" });
-    }
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetOtp = '';
+    user.resetOtpExpireAt = 0;
+    await user.save();
+
+    return res.json({ status: true, message: "Password reset successfully" });
+  } catch (err) {
+    console.error(err);
+    return res.json({ status: false, message: "Server error" });
+  }
 };
 
 module.exports = authController;
