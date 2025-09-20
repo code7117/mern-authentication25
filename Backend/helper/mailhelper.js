@@ -1,95 +1,78 @@
 const nodemailer = require('nodemailer');
 const { otpTemplate, welcomeTemplate, resetPasswordOtpTemplate } = require('../EmailTemplate/email');
 
+// Reusable transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.user,
+    pass: process.env.pass
+  }
+});
 
-const mailhelper = new Object()
+// Verify transporter once
+transporter.verify((err, success) => {
+  if (err) console.log("Mail transporter error:", err);
+  else console.log("Mail transporter ready:", success);
+});
 
+const mailhelper = {};
 
-mailhelper.sendMail = async(email,name)=>{
-    let config = {
-        service:"gmail",
-        auth:{
-            user:process.env.user,
-            pass:process.env.pass
-        }
-    }
-    let transporter = nodemailer.createTransport(config);
-    let message = {
-        from:'adharsh7117@gmail.com',
-        to:email,
-        // subject:subject,
-        html:welcomeTemplate(email,name)//use the template for html
-    };
-    try {
-        let info = await transporter.sendMail(message);
-        console.log('success',info);
-        return{status:true,info};
-        
-    } catch (err) {
-        console.log("failed",err);
-        return{status:false,error:err}
-        
-    }
-}
+// Send welcome email
+mailhelper.sendMail = async (email, name) => {
+  const message = {
+    from: process.env.user,
+    to: email,
+    subject: "Welcome to Our Platform!",
+    html: welcomeTemplate(email, name)
+  };
 
-// =======================
-// SEND OTP EMAIL
-// =======================
+  try {
+    let info = await transporter.sendMail(message);
+    console.log('Welcome Mail sent:', info.response);
+    return { status: true, info };
+  } catch (err) {
+    console.error('Welcome Mail failed:', err);
+    return { status: false, error: err };
+  }
+};
+
+// Send OTP for verification
 mailhelper.sendOtpMail = async (email, name, otp) => {
-  let config = {
-    service: "gmail",
-    auth: {
-      user: process.env.user,
-      pass: process.env.pass
-    }
-  };
-
-  let transporter = nodemailer.createTransport(config);
-
-  let message = {
-    from: 'adharsh7117@gmail.com',
+  const message = {
+    from: process.env.user,
     to: email,
-    subject: "Your OTP Code",
-    html: otpTemplate(name, otp) // Using OTP template
+    subject: "Your Verification OTP",
+    html: otpTemplate(name, otp)
   };
 
   try {
     let info = await transporter.sendMail(message);
-    console.log('OTP Mail sent successfully:', info);
+    console.log('OTP Mail sent:', info.response);
     return { status: true, info };
   } catch (err) {
-    console.log("OTP Mail failed:", err);
+    console.error('OTP Mail failed:', err);
     return { status: false, error: err };
   }
 };
 
-// reset password mail
-
+// Send OTP for password reset
 mailhelper.sendresetOtpMail = async (email, name, otp) => {
-  let config = {
-    service: "gmail",
-    auth: {
-      user: process.env.user,
-      pass: process.env.pass
-    }
-  };
-
-  let transporter = nodemailer.createTransport(config);
-
-  let message = {
-    from: 'adharsh7117@gmail.com',
+  const message = {
+    from: process.env.user,
     to: email,
-    subject: "Your OTP Code",
-    html: resetPasswordOtpTemplate(name, otp) // Using OTP template
+    subject: "Your Password Reset OTP",
+    html: resetPasswordOtpTemplate(name, otp)
   };
 
   try {
     let info = await transporter.sendMail(message);
-    console.log('OTP Mail sent successfully:', info);
+    console.log('Reset OTP Mail sent:', info.response);
     return { status: true, info };
   } catch (err) {
-    console.log("OTP Mail failed:", err);
+    console.error('Reset OTP Mail failed:', err);
     return { status: false, error: err };
   }
 };
-module.exports=mailhelper
+
+module.exports = mailhelper;
